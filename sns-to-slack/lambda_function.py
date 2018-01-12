@@ -47,7 +47,7 @@ DEFAULT_USERNAME = os.environ.get('DEFAULT_USERNAME', 'AWS Lambda')
 DEFAULT_CHANNEL = os.environ.get('DEFAULT_CHANNEL', '#webhook-tests')
 
 
-def get_slack_emoji(event_src, topic_name, event_cond='default'):
+def get_slack_emoji(event_src, event_sev, event_cond='default'):
     '''Map an event source, severity, and condition to an emoji
     '''
     emoji_map = {
@@ -79,9 +79,9 @@ def get_slack_emoji(event_src, topic_name, event_cond='default'):
                 'error': ':fire:'}}}
 
     try:
-        return emoji_map[event_src][topic_name][event_cond]
+        return emoji_map[event_src][event_sev][event_cond]
     except KeyError:
-        if topic_name == 'alerts':
+        if event_sev == 'alerts':
             return ':fire:'
         else:
             return ':information_source:'
@@ -244,15 +244,16 @@ def lambda_handler(event, context):
         event_src = 'other'
 
     # SNS Topic ARN: arn:aws:sns:<REGION>:<AWS_ACCOUNT_ID>:<TOPIC_NAME>
-    #
-    # SNS Topic Names => Slack Channels
-    #  <env>-alerts => alerts-<region>
-    #  <env>-notices => events-<region>
-    #
     region = sns['TopicArn'].split(':')[3]
     topic_name = sns['TopicArn'].split(':')[-1]
-    # event_env = topic_name.split('-')[0]
-    # event_sev = topic_name.split('-')[1]
+
+    # SNS Topic Names
+    #  <env>-alerts
+    #  <env>-notices
+    event_env_tmp = topic_name.split('-')
+    event_env_tmp.pop(-1)
+    event_env = '-'.join(event_env_tmp)
+    event_sev = topic_name.split('-')[-1]
 
     # print('DEBUG:', topic_name, region, event_env, event_sev, event_src)
 
@@ -263,8 +264,8 @@ def lambda_handler(event, context):
     payload = {
         'text': message,
         'channel': get_slack_channel(region, event_src, topic_name, channel_map),
-        'username': get_slack_username(event_src),
-        'icon_emoji': get_slack_emoji(event_src, topic_name, event_cond.lower())}
+        'username': '[{0}] {1}'.format(event_env, get_slack_username(event_src)),
+        'icon_emoji': get_slack_emoji(event_src, event_sev, event_cond.lower())}
     if attachments:
         payload['attachments'] = attachments
     print('DEBUG PAYLOAD:', json.dumps(payload))
