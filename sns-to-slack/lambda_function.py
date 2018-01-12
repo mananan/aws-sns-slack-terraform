@@ -65,7 +65,18 @@ def get_slack_emoji(event_src, topic_name, event_cond='default'):
         'elasticache': {
             'notices': {'default': ':stopwatch:'}},
         'rds': {
-            'notices': {'default': ':registered:'}}}
+            'notices': {'default': ':registered:'}},
+        'elastictranscoder': {
+            'notices': {
+                'progressing': ':stopwatch:',
+                'completed': ':ok:',
+                'warning': ':question:',
+                'error': ':fire:'},
+            'alerts': {
+                'progressing': ':stopwatch:',
+                'completed': ':ok:',
+                'warning': ':question:',
+                'error': ':fire:'}}}
 
     try:
         return emoji_map[event_src][topic_name][event_cond]
@@ -83,7 +94,8 @@ def get_slack_username(event_src):
         'cloudwatch': 'AWS CloudWatch',
         'autoscaling': 'AWS AutoScaling',
         'elasticache': 'AWS ElastiCache',
-        'rds': 'AWS RDS'}
+        'rds': 'AWS RDS',
+        'elastictranscoder': 'Amazon Elastic Transcoder'}
 
     try:
         return username_map[event_src]
@@ -209,6 +221,25 @@ def lambda_handler(event, context):
                 "title": "Details",
                 "value": "<{0}|{1}>".format(title_str, title_lnk_str)
             })
+    elif json_msg.get('pipelineId'):
+        event_src = 'elastictranscoder'
+        event_cond = json_msg['state']
+        color_map = {
+            'PROGRESSING': '#439FE0',
+            'COMPLETED': 'good',
+            'WARNING': 'warning',
+            'ERROR': 'danger'
+        }
+        job_detail_url = "https://{0}.console.aws.amazon.com/elastictranscoder/home#job-details:{1}".format(os.environ.get('AWS_REGION'), json_msg['jobId'])
+        attachments = [{
+            "color": color_map[event_cond],
+            "fallback": message,
+            "fields": [{
+                "title": event_cond,
+                "value": "Job Detail: <{0}|{1}>".format(job_detail_url, json_msg['jobId']),
+                "short": False
+            }]
+        }]
     else:
         event_src = 'other'
 
